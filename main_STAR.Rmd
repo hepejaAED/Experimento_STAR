@@ -11,7 +11,9 @@ knitr::opts_chunk$set(echo = TRUE)
 
 # Introducción
 
-En esta actividad trabajaremos con los datos experimentales del programa STAR, un estudio clásico sobre el impacto del tamaño de las clases en el rendimiento académico. El objetivo es comprender cómo se estima un efecto causal cuando disponemos de datos experimentales y contrastarlo con la dificultad de hacerlo en contextos observacionales
+El Proyecto STAR fue un experimento aleatorio controlado (RCT) diseñado para responder una pregunta fundamental de política pública: ¿Realmente importa el tamaño de la clase para el aprendizaje? En un contexto observacional, esta pregunta es difícil de responder porque las clases pequeñas suelen estar en distritos ricos o con padres muy implicados (confundidores). Para evitar esto, el proyecto STAR asignó aleatoriamente a más de 7,000 estudiantes y sus profesores a tres tipos de grupos: clases pequeñas (13-17 alumnos), clases regulares (22-25 alumnos) y clases regulares con un asistente.
+
+El objetivo de esta actividad es demostrar que, mientras los datos se mantengan bajo el diseño experimental (aleatorios), la diferencia de medias nos da el Efecto Causal. Sin embargo, en cuanto introducimos un criterio de selección (como favorecer a los alumnos con peores notas), rompemos la aleatoriedad y entramos en el terreno de los datos observacionales, donde las conclusiones pueden ser totalmente erróneas si no se corrigen adecuadamente.
 
 
 # Los datos
