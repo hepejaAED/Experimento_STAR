@@ -66,10 +66,20 @@ confint(matematicas,2)
 ```
 **Preguntas**
 
-- Hemos calculado la diferencia de medias en las puntuaciones de lectura entre alumnos en clases pequeñas y regulares. ¿Por qué podemos interpretar esta diferencia como el efecto causal medio del tamaño de clase sobre el rendimiento académico?¿Cuál es la diferencia promedio entre clases pequeñas y normales?
+- **Hemos calculado la diferencia de medias en las puntuaciones de lectura entre alumnos en clases pequeñas y regulares. ¿Por qué podemos interpretar esta diferencia como el efecto causal medio del tamaño de clase sobre el rendimiento académico?¿Cuál es la diferencia promedio entre clases pequeñas y normales?**
 
-- Es posible añadir covariables (como género o etnicidad) en la regresión. Reformula la estimación incluyendo covariables en la expresión (busca en la ayuda de la librería AER). ¿Por qué incluir covariables no cambia la validez causal del estimador, pero puede hacerlo más eficiente (reducir su varianza)? Prueba la estimación del efecto para los distintos grados (kindergarten, 1st, 2nd, 3rd)
+Porque gracias a la aleatorización, el grupo de "clases pequeñas" y "regulares" son estadísticamente idénticos en todo (potencial académico, nivel socioeconómico, etc.) antes de empezar el estudio. La única diferencia sistemática entre ellos es el tamaño de la clase. Por tanto, cualquier diferencia posterior en las notas ($Y$) debe haber sido causada por el tratamiento ($D$).
 
+Comparando la variable `starsmall`, para lectura la clase pequeña saca 8.53 más que en la clase grande, mientras que en matemáticas es 6.87 
+
+
+- **Es posible añadir covariables (como género o etnicidad) en la regresión. Reformula la estimación incluyendo covariables en la expresión (busca en la ayuda de la librería AER). ¿Por qué incluir covariables no cambia la validez causal del estimador, pero puede hacerlo más eficiente (reducir su varianza)? Prueba la estimación del efecto para los distintos grados (kindergarten, 1st, 2nd, 3rd)**
+
+
+En un experimento ideal, las covariables están equilibradas. Añadirlas no cambia el valor esperado del coeficiente porque no están correlacionadas con el tratamiento ya que la asignación fue al azar.
+
+
+Al incluir variables que explican parte de la varianza de las notas (como el género), el "ruido" del modelo disminuye (baja el $R^2$ no explicado). Esto reduce el error estándar del estimador, haciendo que tus intervalos de confianza sean más estrechos.
 
 # Introducción de sesgo de selección
 
@@ -97,10 +107,13 @@ star <- star %>%
 
 **Preguntas**
 
-- ¿Para qué grado read_lag es siempre NA?
+- **¿Para qué grado read_lag es siempre NA?**
 
-- ¿Por qué tiene sentido desde el punto de vista temporal?
+Para Kindergarten. 
 
+- **¿Por qué tiene sentido desde el punto de vista temporal?**
+
+Es el primer año de escolarización registrado en el estudio; no existen datos de un "año anterior" dentro del experimento.
 
 ## Definimos alumnos con bajo rendimiento previo
 
