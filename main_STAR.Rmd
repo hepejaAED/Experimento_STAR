@@ -132,7 +132,9 @@ star <- star %>%
 
 **Pregunta**
 
-- ¿Por qué calculamos los cuantiles por grado y no globalmente?
+- **¿Por qué calculamos los cuantiles por grado y no globalmente?**
+
+Porque la distribución de notas cambia con la edad. El 30% inferior de un niño de 5 años no es el mismo nivel de competencia que el 30% de uno de 9 años. Hacerlo por grado asegura que estamos seleccionando a los "rezagados" respecto a sus pares actuales.
 
 
 ## Filtrado de los datos
@@ -150,8 +152,10 @@ Observa que no se redefine el tratamiento; tan solo se condiciona la muestra.
 
 **Pregunta**
 
-- ¿Qué impacto tiene este filtro sobre el conjunto de tratados y no tratados?
+- **¿Qué impacto tiene este filtro sobre el conjunto de tratados y no tratados?**
 
+
+Se está creando un escenario donde solo los alumnos con dificultades acceden al tratamiento (clase pequeña). Los alumnos "buenos" solo están en el grupo control. En el grupo small, desaparecerán todos los que superen el percentil 30 (un 70% aproximadamente). En el grupo control no se elimina a nadie.
 
 ## ¿A quién estamos eliminando?
 
@@ -165,9 +169,13 @@ star %>%
 
 **Pregunta**
 
-- ¿Qué proporción de alumnos tratados desaparece?
+- **¿Qué proporción de alumnos tratados desaparece?**
 
-- ¿Se elimina algún alumno del grupo control (no tratados)?
+
+
+- **¿Se elimina algún alumno del grupo control (no tratados)?**
+
+
 
 ## Efectos de la intervención en la muestra seleccionada
 
@@ -190,10 +198,14 @@ matematicas |> confint(2)
 
 **Preguntas**
 
-- ¿Significa la estimación que el efecto no es beneficioso para el grupo considerado?
+- **¿Significa la estimación que el efecto no es beneficioso para el grupo considerado?**
 
-- ¿Son comparables los grupos antes del tratamiento?
+No, el efecto sigue siendo positivo, pero la estimación ahora está "contaminada". Al comparar "alumnos con dificultades en clases pequeñas" contra "todos los alumnos (incluidos los brillantes) en clases normales", es muy probable que el coeficiente de star salga negativo o muy bajo. El sesgo de selección está ocultando el beneficio real.
 
+
+- **¿Son comparables los grupos antes del tratamiento?**
+
+No. Se ha roto la propiedad de ignorabilidad. Ahora el grupo de tratamiento es intrínsecamente "peor" académicamente que el grupo control antes de empezar el análisis.
 
 ## Intento de corrección con controles
 
@@ -216,20 +228,56 @@ lectura |> confint(2)
 
 **Pregunta**
 
-- ¿Cuál es el origen fundamental del sesgo en esta actividad?
+- **¿Cuál es el origen fundamental del sesgo en esta actividad?**
 
   - Mala especificación del modelo
 
   - Variables omitidas
   
-  - Problema de selección muestral
+  - **Problema de selección muestral**: Se ha forzado una correlación entre el tratamiento y la capacidad del alumno.
   
   - Falta de tamaño muestral
   
-- En el experimento STAR original, la asignación al tratamiento es aleatoria. Sin embargo, tras aplicar el filtro de la actividad, los datos resultantes se comportan como observacionales. Explica por qué, indicando qué propiedad clave de los datos experimentales se ha perdido.
+- **En el experimento STAR original, la asignación al tratamiento es aleatoria. Sin embargo, tras aplicar el filtro de la actividad, los datos resultantes se comportan como observacionales. Explica por qué, indicando qué propiedad clave de los datos experimentales se ha perdido.**
 
+
+Se ha perdido la Independencia (o Aleatoriedad). En los datos originales, tras el filtro, el tratamiento $D$ depende de $Y(t-1)$, que está altamente correlacionado con los resultados potenciales. Los datos ahora son observacionales porque el "mecanismo de asignación" ya no es una moneda al aire, sino una regla basada en el rendimiento.
 
 # Extensiones
 Repetir el análisis por grado e incluyendo covariables
+
+```{r}
+# Extensiones: Recuperando el efecto causal
+
+library(purrr)
+
+# Función para ejecutar modelos y extraer el coeficiente de 'small'
+estudiar_grado <- function(g) {
+  df_sub <- star_sel %>% filter(grade == g)
+  
+  # Modelo 1: Sesgado (sin controles, solo el filtro aplicado)
+  m1 <- lm(read ~ star, data = df_sub)
+  
+  # Modelo 2: Corregido (añadimos la variable que causó el sesgo: rendimiento previo)
+  # También añadimos controles socioeconómicos para ganar precisión
+  m2 <- lm(read ~ star + read_lag + math_lag + lunch + experience, data = df_sub)
+  
+  # Extraemos resultados
+  bind_rows(
+    tidy(m1) %>% filter(term == "starsmall") %>% mutate(modelo = "Sesgado", grado = g),
+    tidy(m2) %>% filter(term == "starsmall") %>% mutate(modelo = "Corregido", grado = g)
+  )
+}
+
+# Aplicamos a los grados donde tenemos lag (1st, 2nd, 3rd)
+grados_analisis <- c("1  st", "2nd", "3rd")
+resultados_ext <- map_df(grados_analisis, estudiar_grado)
+
+# Visualizamos los resultados
+print(resultados_ext)
+```
+
+
+
 Elabora una estrategia para recuperar el efecto causal en la muestra de datos observacionales
 Discutir paralelismos con missing not at random
