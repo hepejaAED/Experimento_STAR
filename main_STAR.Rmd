@@ -2,7 +2,9 @@
 title: "Experimento STAR"
 author: "Javier Herrero Pérez"
 date: "2026-02-02"
-output: html_document
+output:
+  pdf_document: default
+  html_document: default
 ---
 
 ```{r setup, include=FALSE}
@@ -22,7 +24,7 @@ El objetivo de esta actividad es demostrar que, mientras los datos se mantengan 
 library(dplyr)
 library(AER)
 data(STAR)
-help(STAR)
+
 ```
 
 
