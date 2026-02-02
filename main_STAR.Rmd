@@ -1,0 +1,220 @@
+---
+title: "Experimento STAR"
+author: "Javier Herrero Pérez"
+date: "2026-02-02"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Introducción
+
+En esta actividad trabajaremos con los datos experimentales del programa STAR, un estudio clásico sobre el impacto del tamaño de las clases en el rendimiento académico. El objetivo es comprender cómo se estima un efecto causal cuando disponemos de datos experimentales y contrastarlo con la dificultad de hacerlo en contextos observacionales
+
+
+# Los datos
+
+```{r cars}
+library(dplyr)
+library(AER)
+data(STAR)
+help(STAR)
+```
+
+
+```{r}
+# Convertir a formato long
+nam <- c("star", "read", "math", "lunch", "school", "degree", "ladder",
+         "experience", "tethnicity", "system", "schoolid")
+lev <- c("k", "1", "2", "3")
+
+star <- reshape(STAR, idvar = "id", ids = row.names(STAR),
+                times = lev, timevar = "grade", direction = "long",
+                varying = lapply(nam, function(x) paste(x, lev, sep = "")))
+
+# Mejorar nombres y tipos
+names(star)[5:15] <- nam
+star$id <- factor(star$id)
+star$grade <- factor(star$grade, levels = lev,
+                     labels = c("kindergarten", "1  st", "2nd", "3rd"))
+```
+
+# Estimación insesgada del efecto causal medio
+
+La nota para lectura:
+
+```{r}
+# Obtenemos el efecto causal para los estudiantes de grade=3rd
+
+library(broom)
+lectura <- lm(read ~ star, data = star %>% filter(grade=='3rd')) 
+
+tidy(lectura) 
+confint(lectura,2) 
+```
+
+La nota para matemáticas: 
+
+```{r}
+matematicas <- lm(math ~ star, data = star %>% filter(grade=='3rd')) 
+tidy(matematicas) 
+confint(matematicas,2) 
+```
+**Preguntas**
+
+- Hemos calculado la diferencia de medias en las puntuaciones de lectura entre alumnos en clases pequeñas y regulares. ¿Por qué podemos interpretar esta diferencia como el efecto causal medio del tamaño de clase sobre el rendimiento académico?¿Cuál es la diferencia promedio entre clases pequeñas y normales?
+
+- Es posible añadir covariables (como género o etnicidad) en la regresión. Reformula la estimación incluyendo covariables en la expresión (busca en la ayuda de la librería AER). ¿Por qué incluir covariables no cambia la validez causal del estimador, pero puede hacerlo más eficiente (reducir su varianza)? Prueba la estimación del efecto para los distintos grados (kindergarten, 1st, 2nd, 3rd)
+
+
+# Introducción de sesgo de selección
+
+## Creación de la variable `rendimiento previo`
+
+Vamos a modificar los datos para convertirlos en observacionales. Para ello vamos a simular un tipo de mecanismo de asignación al tratamiento que podría existir en el mundo real.
+
+**Mecanismo no aleatorio de asignación del tratamiento**: aplicamos el tratamiento (grupos reducidos) a los estudiantes cuyo rendimiento haya estado en el curso anterior por debajo del tercer decil (30%) de la distribución de notas.
+
+Para ello vamos a crear la variable rendimiento previo: queremos medir el rendimiento antes del tratamiento en cada grado.
+
+```{r}
+library(dplyr)
+
+star <- star %>%
+  arrange(id, grade) %>%
+  group_by(id) %>%
+  mutate(
+    read_lag = lag(read),
+    math_lag = lag(math)
+  ) %>%
+  ungroup()
+```
+
+
+**Preguntas**
+
+- ¿Para qué grado read_lag es siempre NA?
+
+- ¿Por qué tiene sentido desde el punto de vista temporal?
+
+
+## Definimos alumnos con bajo rendimiento previo
+
+Definimos como bajo rendimiento estar por debajo del tercer decil (30%) en la nota de lectura o matemáticas del grado anterior.
+
+```{r}
+star <- star %>%
+  group_by(grade) %>%
+  mutate(
+    q30_read = quantile(read_lag, 0.3, na.rm = TRUE),
+    q30_math = quantile(math_lag, 0.3, na.rm = TRUE),
+    bottom30 = (read_lag <= q30_read) | (math_lag <= q30_math)
+  ) %>%
+  ungroup()
+```
+
+**Pregunta**
+
+- ¿Por qué calculamos los cuantiles por grado y no globalmente?
+
+
+## Filtrado de los datos
+
+Conservamos solo a los alumnos tratados (small) que están por debajo del 30% de la distribución. El resto de alumnos no tratados se mantienen todos.
+
+```{r}
+star_sel <- star %>%
+  filter(
+    !(star == "small" & !bottom30)
+  )
+```
+
+Observa que no se redefine el tratamiento; tan solo se condiciona la muestra.
+
+**Pregunta**
+
+- ¿Qué impacto tiene este filtro sobre el conjunto de tratados y no tratados?
+
+
+## ¿A quién estamos eliminando?
+
+```{r}
+
+star %>%
+  mutate(retained = !(star == "small" & !bottom30)) %>%
+  group_by(star) %>%
+  summarise(prop_retained = mean(retained, na.rm=TRUE))
+```
+
+**Pregunta**
+
+- ¿Qué proporción de alumnos tratados desaparece?
+
+- ¿Se elimina algún alumno del grupo control (no tratados)?
+
+## Efectos de la intervención en la muestra seleccionada
+
+A continuación comparamos el rendimiento previo entre tratados y no tratados en la muestra filtrada. Para lectura:
+
+
+```{r}
+lectura <- lm(read ~ star, data = star_sel |> filter(grade=='3rd'))
+lectura |> tidy() 
+lectura |> confint(2) 
+```
+
+Para matemáticas:
+
+```{r}
+matematicas <- lm(math ~ star, data = star_sel |> filter(grade=='3rd')) 
+matematicas |> tidy() 
+matematicas |> confint(2) 
+```
+
+**Preguntas**
+
+- ¿Significa la estimación que el efecto no es beneficioso para el grupo considerado?
+
+- ¿Son comparables los grupos antes del tratamiento?
+
+
+## Intento de corrección con controles
+
+Añadimos controles por rendimiento previo, perfil socioeconómico y características del profesor:
+
+
+```{r}
+lectura <- lm(read ~ star + read_lag + math_lag + lunch + gender + ethnicity + degree + experience + tethnicity, 
+              data = star_sel |> filter(grade=='3rd'))
+lectura |> tidy()
+lectura |> confint(2) 
+```
+
+**Preguntas**
+
+- ¿Se corrige el sesgo?
+
+
+# Discusión final
+
+**Pregunta**
+
+- ¿Cuál es el origen fundamental del sesgo en esta actividad?
+
+  - Mala especificación del modelo
+
+  - Variables omitidas
+  
+  - Problema de selección muestral
+  
+  - Falta de tamaño muestral
+  
+- En el experimento STAR original, la asignación al tratamiento es aleatoria. Sin embargo, tras aplicar el filtro de la actividad, los datos resultantes se comportan como observacionales. Explica por qué, indicando qué propiedad clave de los datos experimentales se ha perdido.
+
+
+# Extensiones
+Repetir el análisis por grado e incluyendo covariables
+Elabora una estrategia para recuperar el efecto causal en la muestra de datos observacionales
+Discutir paralelismos con missing not at random
